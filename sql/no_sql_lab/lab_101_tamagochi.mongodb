@@ -1,0 +1,181 @@
+use("tamagotchi_db");
+
+// db
+
+// create collections
+db.createCollection("users");
+db.createCollection("pets");
+db.createCollection("pet_logs");
+
+// show collections
+db.getCollectionNames();
+
+db.users.insertMany([
+  {
+    full_name: "Laura Torres",
+    email: "laura.torres@example.com",
+    created_at: new Date(),
+  },
+  {
+    full_name: "Miguel Rojas",
+    email: "miguel.rojas@example.com",
+    created_at: new Date(),
+  },
+  {
+    full_name: "Sofía Martínez",
+    email: "sofia.martinez@example.com",
+    created_at: new Date(),
+  },
+]);
+
+// all users
+db.users.find();
+
+// only name and email
+db.users.find({}, { full_name: 1, email: 1 });
+
+// find one by email
+db.users.findOne({ email: "laura.torres@example.com" });
+
+const userLaura = db.users.findOne({ email: "laura.torres@example.com" });
+const userMiguel = db.users.findOne({ email: "miguel.rojas@example.com" });
+
+db.pets.insertMany([
+  {
+    name: "Pixel",
+    owner_id: userLaura._id,
+    species: "cat",
+    created_at: new Date(),
+    base_stats: {
+      max_hunger: 100,
+      max_energy: 100,
+      max_happiness: 100,
+    },
+  },
+  {
+    name: "Bolt",
+    owner_id: userLaura._id,
+    species: "dog",
+    created_at: new Date(),
+    base_stats: {
+      max_hunger: 120,
+      max_energy: 80,
+      max_happiness: 110,
+    },
+  },
+  {
+    name: "Luna",
+    owner_id: userMiguel._id,
+    species: "dragon",
+    created_at: new Date(),
+    base_stats: {
+      max_hunger: 150,
+      max_energy: 150,
+      max_happiness: 200,
+    },
+  },
+]);
+
+// all pets
+db.pets.find();
+
+// only name, owner_id and species
+db.pets.find({}, { name: 1, owner_id: 1, species: 1 });
+
+// pets of Laura
+db.pets.find({ owner_id: userLaura._id });
+
+// pets of species "dragon"
+db.pets.find({ species: "dragon" });
+
+// change species of "Bolt" to "super-dog"
+db.pets.updateOne({ name: "Bolt" }, { $set: { species: "super-dog" } });
+
+// add a field "active" to all pets
+db.pets.updateMany({}, { $set: { active: true } });
+
+// delete one pet by name
+db.pets.deleteOne({ name: "Bolt" });
+
+// prepare pet references
+const petPixel = db.pets.findOne({ name: "Pixel" });
+const petLuna = db.pets.findOne({ name: "Luna" });
+
+// Pixel eats (feed)
+db.pet_logs.insertOne({
+  pet_id: petPixel._id,
+  action: "feed",
+  created_at: new Date(),
+  delta: {
+    hunger: +20,
+    energy: -5,
+    happiness: +5,
+  },
+  comment: "Gave Pixel some fish",
+});
+
+// Pixel plays
+db.pet_logs.insertOne({
+  pet_id: petPixel._id,
+  action: "play",
+  created_at: new Date(),
+  delta: {
+    hunger: -10,
+    energy: -15,
+    happiness: +20,
+  },
+  comment: "Played with a laser pointer",
+});
+
+// Luna sleeps
+db.pet_logs.insertOne({
+  pet_id: petLuna._id,
+  action: "sleep",
+  created_at: new Date(),
+  delta: {
+    hunger: -5,
+    energy: +30,
+    happiness: +5,
+  },
+  comment: "Long nap in the cave",
+});
+
+db.pet_logs.insertMany([
+  {
+    pet_id: petPixel._id,
+    action: "feed",
+    created_at: new Date(),
+    delta: { hunger: +15, energy: -3, happiness: +5 },
+    comment: "Dry food",
+  },
+  {
+    pet_id: petPixel._id,
+    action: "sleep",
+    created_at: new Date(),
+    delta: { hunger: -5, energy: +25, happiness: +2 },
+    comment: "Short nap",
+  },
+  {
+    pet_id: petLuna._id,
+    action: "play",
+    created_at: new Date(),
+    delta: { hunger: -20, energy: -25, happiness: +30 },
+    comment: "Flying practice",
+  },
+]);
+
+db.pet_logs.find();
+db.pet_logs.find({ pet_id: petPixel._id });
+
+db.pet_logs.find(
+  { pet_id: petPixel._id },
+  { action: 1, created_at: 1, _id: 0 }
+);
+
+db.pet_logs.find({ pet_id: petPixel._id }).sort({ created_at: 1 });
+
+const pixel = db.pets.findOne({ name: "Pixel" });
+
+db.pet_logs
+  .find({ pet_id: pixel._id }, { action: 1, delta: 1, created_at: 1 })
+  .sort({ created_at: 1 });

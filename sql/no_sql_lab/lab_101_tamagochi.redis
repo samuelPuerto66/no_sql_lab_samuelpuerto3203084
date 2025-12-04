@@ -1,0 +1,279 @@
+# ============================================
+# Laboratorio 4 – Redis para Mascota Virtual
+# (estado en tiempo real, acciones y buffs)
+# ============================================
+
+# Este laboratorio asume:
+# - Redis ya está instalado y corriendo.
+# - Estás usando redis-cli para ejecutar los comandos.
+# - En MongoDB ya tienes mascotas creadas (Laboratorio 3),
+#   y puedes reutilizar el mismo "id lógico" de la mascota,
+#   por ejemplo: pet:1, pet:2, etc.
+
+# La idea:
+# - Usar HASH para guardar el estado actual de la mascota:
+#   hambre (hunger), energía (energy), felicidad (happiness).
+# - Usar INCR/INCRBY para contar interacciones.
+# - Usar SETEX/TTL para estados/buffs temporales.
+
+
+# --------------------------------------------
+# 0. Conexión a Redis
+# --------------------------------------------
+
+redis-cli
+
+# Probar conexión:
+PING
+# Esperado: PONG
+
+
+
+# --------------------------------------------
+# 1. Estado base de una mascota con HASH
+# --------------------------------------------
+
+# Supongamos que tenemos una mascota lógica "pet:1"
+# (podría corresponder a una mascota real en MongoDB).
+# Vamos a crear su estado inicial con:
+# - hunger   (0 a 100)
+# - energy   (0 a 100)
+# - happiness (0 a 100)
+
+# Crear / inicializar el estado de la mascota "pet:1":
+
+HSET pet:1:state hunger 50 energy 80 happiness 60
+
+# Ver el estado completo de la mascota:
+
+HGETALL pet:1:state
+
+# Leer un campo específico (por ejemplo, la energía):
+
+HGET pet:1:state energy
+
+
+
+# --------------------------------------------
+# 2. Simular acciones sobre la mascota
+#    usando HINCRBY
+# --------------------------------------------
+
+# Vamos a definir 3 acciones básicas:
+# - feed  (comer)
+# - play  (jugar)
+# - sleep (dormir)
+#
+# Cada acción modifica los valores actuales:
+# - feed:   aumenta hunger, sube un poco happiness, baja un poco energy
+# - play:   baja energy, sube bastante happiness, baja un poco hunger
+# - sleep:  sube energy, baja un poco hunger, sube un poco happiness
+
+# IMPORTANTE:
+# Redis no tiene "números mínimos/máximos" por defecto.
+# En un sistema real, el backend se encarga de no pasar de 0 o 100.
+# Aquí solo practicamos los comandos.
+
+
+# 2.1. Acción: feed (comer)
+# --------------------------------
+# Efectos propuestos:
+# - hunger   +15
+# - energy   -5
+# - happiness +5
+
+# Ejecutar la acción "feed" sobre pet:1
+
+HINCRBY pet:1:state hunger 15
+HINCRBY pet:1:state energy -5
+HINCRBY pet:1:state happiness 5
+
+# Ver el estado luego de comer:
+
+HGETALL pet:1:state
+
+
+
+# 2.2. Acción: play (jugar)
+# --------------------------------
+# Efectos propuestos:
+# - hunger   -10
+# - energy   -20
+# - happiness +20
+
+# Ejecutar la acción "play" sobre pet:1
+
+HINCRBY pet:1:state hunger -10
+HINCRBY pet:1:state energy -20
+HINCRBY pet:1:state happiness 20
+
+# Ver el estado luego de jugar:
+
+HGETALL pet:1:state
+
+
+
+# 2.3. Acción: sleep (dormir)
+# --------------------------------
+# Efectos propuestos:
+# - hunger   -5
+# - energy   +25
+# - happiness +5
+
+# Ejecutar la acción "sleep" sobre pet:1
+
+HINCRBY pet:1:state hunger -5
+HINCRBY pet:1:state energy 25
+HINCRBY pet:1:state happiness 5
+
+# Ver el estado luego de dormir:
+
+HGETALL pet:1:state
+
+
+
+# --------------------------------------------
+# 3. Contador de interacciones de la mascota
+#    (INCR, GET)
+# --------------------------------------------
+
+# Queremos saber cuántas veces el usuario ha interactuado
+# con la mascota (ha hecho feed/play/sleep, etc.).
+# Usaremos una key:
+# pet:1:interactions
+
+# Cada vez que el usuario realiza una acción, aumentamos el contador:
+
+INCR pet:1:interactions
+INCR pet:1:interactions
+INCR pet:1:interactions
+
+# Consultar el total de interacciones realizadas:
+
+GET pet:1:interactions
+
+
+
+# --------------------------------------------
+# 4. Buffs o estados temporales con TTL
+#    (SETEX, TTL)
+# --------------------------------------------
+
+# Ahora queremos simular un "buff" temporal, por ejemplo:
+# - "super-happy": la mascota tiene un estado de felicidad especial
+#   durante cierto tiempo.
+#
+# Usaremos una key:
+# pet:1:buff
+
+# Crear un buff temporal "super-happy" que dure 120 segundos:
+
+SETEX pet:1:buff 120 "super-happy"
+
+# Ver el valor del buff:
+
+GET pet:1:buff
+
+# Ver cuántos segundos le quedan al buff:
+
+TTL pet:1:buff
+
+# Esperar algunos segundos y volver a consultar TTL:
+
+TTL pet:1:buff
+
+# Cuando el buff expire, GET devolverá (nil) y TTL devolverá -2.
+
+
+# Podemos crear diferentes buffs con diferentes TTL, por ejemplo:
+SETEX pet:1:buff:food 60 "full-belly"
+SETEX pet:1:buff:play 30 "excited"
+
+GET pet:1:buff:food
+TTL pet:1:buff:food
+
+
+
+# --------------------------------------------
+# 5. Manejo de múltiples mascotas
+# --------------------------------------------
+
+# Podemos repetir la misma lógica para otras mascotas:
+# pet:2, pet:3, etc.
+# Supongamos que tenemos una segunda mascota "pet:2":
+
+HSET pet:2:state hunger 40 energy 90 happiness 70
+
+# Acción feed sobre pet:2:
+
+HINCRBY pet:2:state hunger 10
+HINCRBY pet:2:state energy -5
+HINCRBY pet:2:state happiness 5
+
+# Ver estado de pet:2:
+
+HGETALL pet:2:state
+
+# Contador de interacciones de pet:2:
+
+INCR pet:2:interactions
+GET pet:2:interactions
+
+
+
+# --------------------------------------------
+# 6. Limpieza de claves de laboratorio
+#    (KEYS, DEL)
+# --------------------------------------------
+
+# Listar claves relacionadas con este laboratorio:
+
+KEYS pet:1:*
+KEYS pet:2:*
+
+# Borrar claves si quieres reiniciar el estado de las mascotas:
+
+DEL pet:1:state
+DEL pet:1:interactions
+DEL pet:1:buff
+DEL pet:1:buff:food
+DEL pet:1:buff:play
+
+DEL pet:2:state
+DEL pet:2:interactions
+
+
+
+# --------------------------------------------
+# 7. Mini–retos (para el estudiante)
+# --------------------------------------------
+
+# Reto 1 – Secuencia de acciones
+# - Inicializa pet:3:state con:
+#   hunger=50, energy=50, happiness=50
+# - Aplica esta secuencia:
+#   feed, play, play, sleep
+# - Muestra el estado final con HGETALL
+# - Cuenta interacciones en pet:3:interactions
+
+# Reto 2 – Control de límites (conceptual)
+# - Supón que hunger, energy, happiness deben estar entre 0 y 100.
+# - Explica qué tendría que hacer el backend de tu aplicación
+#   para evitar que al usar HINCRBY los valores se salgan de ese rango.
+
+# Reto 3 – Buff combinado con acción
+# - Crea un buff "training" para pet:1 con duración de 45 segundos.
+# - Mientras el buff esté activo, cada acción "play" debería (en teoría)
+#   sumar más happiness que lo normal.
+# - Explica (en texto) cómo tu código de backend:
+#   1) Consultaría GET pet:1:buff:training
+#   2) Decidiría cuánto sumar a happiness en Redis.
+
+# Reto 4 – Vincular con MongoDB (conceptual)
+# - Supón que en MongoDB tienes una mascota con _id "643f..."
+# - En lugar de usar pet:1, define la key:
+#   pet:643f...:state
+# - Explica cómo el backend:
+#   1) Usaría ese _id para leer el estado en Redis.
+#   2) Guardaría logs de acciones en la colección pet_logs de MongoDB
+#      cada vez que el usuario presiona "feed", "play" o "sleep".

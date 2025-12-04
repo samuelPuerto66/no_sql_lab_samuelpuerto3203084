@@ -1,0 +1,251 @@
+# ============================================
+# Laboratorio 2 – Redis para sistema de turnos
+# (colas, TTL y contadores en memoria)
+# ============================================
+
+# Este laboratorio asume:
+# - Redis ya está instalado y corriendo.
+# - Estás usando redis-cli para ejecutar los comandos.
+
+# --------------------------------------------
+# 0. Conexión a Redis
+# --------------------------------------------
+
+# Abrir el cliente:
+redis-cli
+
+# Probar conexión:
+PING
+# Respuesta esperada:
+# PONG
+
+
+# --------------------------------------------
+# 1. Manejo de colas de turnos con LIST
+# --------------------------------------------
+
+# Imagina que hoy es 2025-12-01 y quieres manejar la cola de turnos de ese día.
+# Usaremos la key: queue:2025-12-01
+
+# Agregar turnos a la cola
+# Cada turno lo representaremos con un ID de texto.
+# Por ejemplo, puede coincidir con el _id de la cita en MongoDB, o un código interno como turn-001.
+
+# agregar turnos al final de la cola (llegan en orden)
+
+RPUSH queue:2025-12-01 "turn-001"
+RPUSH queue:2025-12-01 "turn-002"
+RPUSH queue:2025-12-01 "turn-003"
+RPUSH queue:2025-12-01 "turn-004"
+
+# Ver el contenido de la cola
+# 0 -1 = desde el primer elemento hasta el último.
+
+LRANGE queue:2025-12-01 0 -1
+
+
+# Llamar al siguiente turno (modo FIFO)
+# Cuando el sistema llama al siguiente cliente, sacamos del inicio de la cola:
+
+LPOP queue:2025-12-01
+
+
+# Vuelve a listar la cola:
+
+LRANGE queue:2025-12-01 0 -1
+
+
+# Simular varias atenciones
+
+LPOP queue:2025-12-01
+LPOP queue:2025-12-01
+
+
+# Hasta que la cola quede vacía
+
+LRANGE queue:2025-12-01 0 -1
+
+
+
+# --------------------------------------------
+# 2. Reservas temporales de turno con TTL
+#    (SET, SETEX, TTL)
+# --------------------------------------------
+
+# Ahora vas a simular reservas de turno que expiran si el usuario no confirma.
+# Usaremos keys del estilo:
+# reservation:<id_turno>
+
+# Crear una reserva con expiración usando SETEX
+# Sintaxis: SETEX key ttl_en_segundos value
+
+SETEX reservation:turn-005 60 "user-123"
+
+
+# Crear una reserva con expiración usando SET ... EX
+# Sintaxis: SET key value EX ttl_en_segundos
+
+SET reservation:turn-006 "user-456" EX 90
+
+
+# Consultar el valor de una reserva
+
+GET reservation:turn-005
+
+
+# Ver cuánto tiempo le queda a la reserva (en segundos)
+
+TTL reservation:turn-005
+
+
+# Simular expiración de una reserva con TTL corto
+# 1. Crear una reserva que dure 10 segundos
+
+SETEX reservation:turn-007 10 "user-789"
+
+# 2. Consultar de inmediato
+
+GET reservation:turn-007
+TTL reservation:turn-007
+
+# 3. Esperar más de 10 segundos y volver a consultar
+
+GET reservation:turn-007
+TTL reservation:turn-007
+# Deberías ver que la key ya no existe (GET -> (nil), TTL -> -2)
+
+
+
+# --------------------------------------------
+# 3. Contadores de turnos atendidos
+#    (INCR, GET)
+# --------------------------------------------
+
+# Ahora vas a contar cuántos turnos se atendieron en un día.
+# Usaremos una key por fecha:
+# appointments:served:YYYY-MM-DD
+
+# Incrementar el contador cada vez que se atiende un turno
+
+INCR appointments:served:2025-12-01
+INCR appointments:served:2025-12-01
+INCR appointments:served:2025-12-01
+
+
+# Consultar el valor actual del contador
+
+GET appointments:served:2025-12-01
+
+
+# Contadores por servicio (opcional)
+# Por ejemplo:
+# appointments:served:haircut:2025-12-01
+# appointments:served:shave:2025-12-01
+
+INCR appointments:served:haircut:2025-12-01
+INCR appointments:served:haircut:2025-12-01
+INCR appointments:served:shave:2025-12-01
+
+GET appointments:served:haircut:2025-12-01
+GET appointments:served:shave:2025-12-01
+
+
+
+# --------------------------------------------
+# 4. Información rápida del turno actual con HASH
+#    (HSET, HGET, HGETALL)
+# --------------------------------------------
+
+# Ahora vas a guardar información del turno que se está atendiendo en este momento.
+# Usaremos un hash con la key:
+# current:turn
+
+# Crear / actualizar el turno actual
+
+HSET current:turn id "turn-010" user "user-123" service "haircut" status "in_progress"
+
+
+# Ver todos los campos del hash
+
+HGETALL current:turn
+
+
+# Leer un campo específico del hash
+
+HGET current:turn status
+
+
+# Actualizar el estado del turno a "completed"
+
+HSET current:turn status "completed"
+
+# Verificar todos los campos después del cambio
+
+HGETALL current:turn
+
+
+
+# --------------------------------------------
+# 5. Limpieza básica de claves de laboratorio
+#    (KEYS, DEL)
+# --------------------------------------------
+
+# Listar claves relacionadas con el laboratorio
+# (En entornos reales se recomienda evitar KEYS en bases grandes.
+#  Aquí se usa solo con fines de práctica.)
+
+KEYS queue:*
+KEYS reservation:*
+KEYS appointments:served:*
+KEYS current:*
+
+
+# Borrar claves específicas si quieres reiniciar el laboratorio
+
+DEL queue:2025-12-01
+DEL appointments:served:2025-12-01
+DEL appointments:served:haircut:2025-12-01
+DEL appointments:served:shave:2025-12-01
+DEL current:turn
+
+
+
+# --------------------------------------------
+# 6. Mini–retos (para el estudiante)
+# --------------------------------------------
+
+# Reto 1 – Simular un día completo
+# - Crear una cola queue:2025-12-02 con al menos 5 turnos (RPUSH).
+# - Atender 3 turnos con LPOP.
+# - Cada vez que atiendas un turno, ejecuta INCR appointments:served:2025-12-02.
+# - Al final:
+#   - Muestra la cola restante con LRANGE queue:2025-12-02 0 -1
+#   - Muestra el total atendido con GET appointments:served:2025-12-02
+
+
+# Reto 2 – Reservas con expiración
+# - Crear 3 reservas:
+#   reservation:turn-A con TTL 30
+#   reservation:turn-B con TTL 60
+#   reservation:turn-C con TTL 120
+# - Consultar periódicamente TTL para ver cuál expira primero.
+# - Observar el comportamiento de GET y TTL después de que expiren.
+
+
+# Reto 3 – Turno actual vinculado a MongoDB (conceptual)
+# - Tomar un _id real de una cita de MongoDB (colección appointments).
+# - Guardarlo en el hash current:turn como campo appointment_id.
+#   Ejemplo (sólo estructura):
+#   HSET current:turn appointment_id "<_id_de_MongoDB>"
+# - Explicar cómo un backend podría:
+#   1. Leer current:turn en Redis.
+#   2. Usar appointment_id para hacer una consulta en MongoDB
+#      y obtener todos los datos de la cita.
+
+
+# Reto 4 – Contador por servicio (nivel adicional)
+# - Definir contadores del tipo:
+#   appointments:served:service:<service_name>:2025-12-02
+# - Simular 5 atenciones de "Corte de cabello" y 3 de "Afeitado"
+#   usando INCR sobre cada contador.
+# - Consultar el resultado con GET para cada servicio.

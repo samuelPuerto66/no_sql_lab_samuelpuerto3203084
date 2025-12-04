@@ -1,0 +1,294 @@
+/* global use, db */
+
+// create database turnos_db and collection users
+use("turnos_db");
+db.createCollection("users");
+
+// db
+
+// create collections
+db.createCollection("services");
+db.createCollection("appointments");
+
+// show collections
+db.getCollectionNames();
+
+// insertOne
+db.users.insertOne({
+  full_name: "Juan Pérez",
+  email: "juan.perez@example.com",
+  phone: "+57 3001234567",
+  created_at: new Date(),
+});
+
+// insertMany
+db.users.insertMany([
+  {
+    full_name: "Ana Gómez",
+    email: "ana.gomez@example.com",
+    phone: "+57 3011112233",
+    created_at: new Date(),
+  },
+  {
+    full_name: "Carlos López",
+    email: "carlos.lopez@example.com",
+    phone: "+57 3022223344",
+    created_at: new Date(),
+  },
+  {
+    full_name: "María Rodríguez",
+    email: "maria.rodriguez@example.com",
+    phone: "+57 3033334455",
+    created_at: new Date(),
+  },
+]);
+
+// all users
+db.users.find();
+
+// only name and email (projection)
+db.users.find({}, { full_name: 1, email: 1 });
+
+// filter by email
+db.users.find({ email: "ana.gomez@example.com" });
+
+// updateOne: change phone of one user
+db.users.updateOne(
+  { email: "juan.perez@example.com" },
+  { $set: { phone: "+57 3009998888" } }
+);
+
+// updateMany: add a field "active" to all users
+db.users.updateMany({}, { $set: { active: true } });
+
+// deleteOne: remove a user by email
+db.users.deleteOne({ email: "carlos.lopez@example.com" });
+
+// insert services
+db.services.insertMany([
+  {
+    name: "Corte de cabello",
+    description: "Corte estándar para caballero",
+    duration_minutes: 30,
+    active: true,
+  },
+  {
+    name: "Afeitado",
+    description: "Afeitado clásico",
+    duration_minutes: 20,
+    active: true,
+  },
+  {
+    name: "Tinte",
+    description: "Tinte de cabello",
+    duration_minutes: 60,
+    active: true,
+  },
+]);
+
+// all services
+db.services.find();
+
+// only active services
+db.services.find({ active: true });
+
+// projection: only name and duration
+db.services.find({}, { name: 1, duration_minutes: 1 });
+
+// deactivate "Tinte"
+db.services.updateOne({ name: "Tinte" }, { $set: { active: false } });
+
+// increase duration of "Corte de cabello" to 40 minutes
+db.services.updateOne(
+  { name: "Corte de cabello" },
+  { $set: { duration_minutes: 40 } }
+);
+
+db.services.updateOne(
+  { name: "Afeitado" },
+  {
+    $set: {
+      duration_minutes: 40,
+      active: false,
+    },
+  }
+);
+
+// delete one service by name
+db.services.deleteOne({ name: "Afeitado" });
+
+// consult users and services to get their _id
+const userJuan = db.users.findOne({ email: "juan.perez@example.com" });
+const userAna = db.users.findOne({ email: "ana.gomez@example.com" });
+const userMaria = db.users.findOne({ email: "maria.rodriguez@example.com" });
+
+const serviceCorte = db.services.findOne({ name: "Corte de cabello" });
+const serviceAfeitado = db.services.findOne({ name: "Afeitado" });
+
+userJuan._id;
+
+insertOne;
+db.appointments.insertOne({
+  user_id: userJuan._id,
+  service_id: serviceCorte._id,
+  date: ISODate("2025-12-01T09:00:00Z"),
+  status: "scheduled",
+  notes: "First visit",
+  created_at: new Date(),
+});
+
+// insertMany
+db.appointments.insertMany([
+  {
+    user_id: userAna._id,
+    service_id: serviceCorte._id,
+    date: ISODate("2025-12-01T10:00:00Z"),
+    status: "scheduled",
+    notes: "Regular customer",
+    created_at: new Date(),
+  },
+  {
+    user_id: userMaria._id,
+    service_id: serviceAfeitado?._id || serviceCorte._id,
+    date: ISODate("2025-12-01T11:00:00Z"),
+    status: "scheduled",
+    notes: "First time",
+    created_at: new Date(),
+  },
+]);
+
+// all appointments
+db.appointments.find();
+
+// appointments with status = "scheduled"
+db.appointments.find({ status: "scheduled" });
+
+// appointments of Ana
+db.appointments.find({ user_id: userAna._id });
+
+// appointments from a given date
+// $gte (Greater Than or Equal to)
+db.appointments.find({
+  date: { $gte: ISODate("2025-12-01T00:00:00Z") },
+});
+
+// projection: date and status only
+db.appointments.find({}, { date: 1, status: 1 });
+
+// sort by date ascending, limit to first 5
+// date 1 means ascending order
+// date -1 means descending order
+db.appointments.find().sort({ date: 1 }).limit(5);
+
+// mark one appointment as completed
+const oneAppointment = db.appointments.findOne({ user_id: userJuan._id });
+
+db.appointments.updateOne(
+  { _id: oneAppointment._id },
+  {
+    $set: {
+      status: "completed",
+      completed_at: new Date(),
+    },
+  }
+);
+
+// cancel all appointments for a specific day (conceptual example)
+// $gte (Greater Than or Equal to)
+// $lt (Less Than)
+db.appointments.updateMany(
+  {
+    date: {
+      $gte: ISODate("2025-12-01T00:00:00Z"),
+      $lt: ISODate("2025-12-02T00:00:00Z"),
+    },
+  },
+  {
+    $set: {
+      status: "cancelled",
+      cancelled_at: new Date(),
+      cancel_reason: "System maintenance",
+    },
+  }
+);
+
+// deleteOne: remove one appointment by _id
+const apptToDelete = db.appointments.findOne({ user_id: userAna._id });
+
+db.appointments.deleteOne({
+  _id: apptToDelete._id,
+});
+
+// soft delete: mark appointment as deleted instead of removing
+db.appointments.updateOne(
+  { _id: apptToDelete._id },
+  {
+    $set: {
+      status: "cancelled",
+      deleted: true,
+      cancelled_at: new Date(),
+    },
+  }
+);
+
+/**
+ * Mini-Challenges (To be completed at the end of the lab)
+ * -------------------------------------------------------------
+ */
+
+// 1. List all scheduled appointments for the service "Haircut".
+// (Requires using the serviceCorte._id variable previously set)
+db.appointments.find({
+  status: "scheduled",
+  service_id: serviceCorte._id,
+});
+
+// 2. Display the appointments from 2025-12-01 ordered by time,
+// showing only date, status, and user_id.
+db.appointments
+  .find(
+    {
+      date: {
+        $gte: ISODate("2025-12-01T00:00:00Z"),
+        $lt: ISODate("2025-12-02T00:00:00Z"), // Ensures we get the whole day
+      },
+    },
+    { date: 1, status: 1, user_id: 1 } // Projection: show only these fields
+  )
+  .sort({ date: 1 }); // Sort by date ascending (time)
+
+// 3. Update all appointments in 'scheduled' status with a past date to 'completed'.
+db.appointments.updateMany(
+  {
+    status: "scheduled",
+    date: { $lt: new Date() }, // $lt (Less Than) the current date/time
+  },
+  {
+    $set: { status: "completed" },
+  }
+);
+
+// 4. Delete (or perform a soft delete on) all cancelled appointments older than 30 days.
+// (We will use the soft delete approach by adding a 'deleted_at' field.)
+
+// Calculates the date 30 days ago from the current time.
+const thirtyDaysAgo = new Date(new Date().setDate(new Date().getDate() - 30));
+
+// --- Soft Delete (Recommended) ---
+db.appointments.updateMany(
+  {
+    status: "cancelled",
+    date: { $lt: thirtyDaysAgo },
+  },
+  {
+    $set: { deleted_at: new Date() },
+  }
+);
+
+// --- Hard Delete (Alternative, permanently removes documents) ---
+/*
+db.appointments.deleteMany({ 
+  status: "cancelled",
+  date: { $lt: thirtyDaysAgo } 
+});
+*/
